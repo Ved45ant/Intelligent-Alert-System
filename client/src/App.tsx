@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchAlerts, fetchAlertById, resolveAlertApi, fetchRulesOverview, getMe } from './api/api';
+import { fetchAlerts, fetchAlertById, resolveAlertApi, fetchRulesOverview, getMe, reloadRules } from './api/api';
 import AutoClosedList from './components/AutoClosedList';
 import TrendsChartContainer from './components/TrendsChartContainer';
 import RulesConfig from './components/RulesConfig';
@@ -140,7 +140,17 @@ export default function App() {
             </div>
             {user?.role === 'admin' && (
               <div className="card" style={{ marginTop: 12 }}>
-                <RulesConfig rules={rules} canReload={true} onReload={async () => { await fetch('/api/alerts/rules/reload', { method:'POST', headers:{ Authorization:`Bearer ${token}` } }); setTimeout(triggerRefresh,500); }} />
+                <RulesConfig rules={rules} canReload={true} onReload={async () => { 
+                  try {
+                    await reloadRules();
+                    const r = await fetchRulesOverview();
+                    setRules(r);
+                    triggerRefresh();
+                  } catch (err) {
+                    console.error('Failed to reload rules:', err);
+                    alert('Failed to reload rules');
+                  }
+                }} />
               </div>
             )}
           </div>

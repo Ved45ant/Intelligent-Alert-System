@@ -1,15 +1,246 @@
 {
-    "overspeed": {
-        "escalate_if_count": 3,
-        "window_mins": 60,
-        "escalate_to": "CRITICAL"
+    "rules": [
+        {
+            "ruleId": "overspeed-low",
+            "name": "Low Speed Violation",
+            "eventTypes": ["overspeed"],
+            "condition": {
+                "speed": { "$gte": 70, "$lt": 90 }
+            },
+            "severity": "INFO",
+            "description": "Speed between 70-90 km/h - Minor violation"
+        },
+        {
+            "ruleId": "overspeed-moderate",
+            "name": "Moderate Overspeed",
+            "eventTypes": ["overspeed"],
+            "condition": {
+                "speed": { "$gte": 90, "$lt": 110 }
+            },
+            "severity": "WARNING",
+            "description": "Speed between 90-110 km/h - Moderate risk"
+        },
+        {
+            "ruleId": "overspeed-high",
+            "name": "High Overspeed",
+            "eventTypes": ["overspeed"],
+            "condition": {
+                "speed": { "$gte": 110, "$lt": 130 }
+            },
+            "severity": "CRITICAL",
+            "description": "Speed between 110-130 km/h - High risk"
+        },
+        {
+            "ruleId": "overspeed-extreme",
+            "name": "Extreme Overspeed",
+            "eventTypes": ["overspeed"],
+            "condition": {
+                "speed": { "$gte": 130 }
+            },
+            "severity": "CRITICAL",
+            "description": "Speed exceeding 130 km/h - Extreme danger"
+        },
+        {
+            "ruleId": "harsh-brake-light",
+            "name": "Light Harsh Braking",
+            "eventTypes": ["harsh_brake"],
+            "condition": {
+                "accelForce": { "$lte": -3.0, "$gt": -5.0 }
+            },
+            "severity": "INFO",
+            "description": "Braking force between -3G to -5G - Light impact"
+        },
+        {
+            "ruleId": "harsh-brake-moderate",
+            "name": "Moderate Harsh Braking",
+            "eventTypes": ["harsh_brake"],
+            "condition": {
+                "accelForce": { "$lte": -5.0, "$gt": -7.0 }
+            },
+            "severity": "WARNING",
+            "description": "Braking force between -5G to -7G - Moderate risk"
+        },
+        {
+            "ruleId": "harsh-brake-severe",
+            "name": "Severe Harsh Braking",
+            "eventTypes": ["harsh_brake"],
+            "condition": {
+                "accelForce": { "$lte": -7.0 }
+            },
+            "severity": "CRITICAL",
+            "description": "Braking force exceeding -7G - Severe risk"
+        },
+        {
+            "ruleId": "feedback-poor",
+            "name": "Poor Passenger Feedback",
+            "eventTypes": ["feedback_negative"],
+            "condition": {
+                "passengerRating": { "$eq": 2 }
+            },
+            "severity": "INFO",
+            "description": "2-star rating from passenger"
+        },
+        {
+            "ruleId": "feedback-bad",
+            "name": "Bad Passenger Feedback",
+            "eventTypes": ["feedback_negative"],
+            "condition": {
+                "passengerRating": { "$eq": 1 }
+            },
+            "severity": "WARNING",
+            "description": "1-star rating from passenger"
+        },
+        {
+            "ruleId": "compliance-expiring",
+            "name": "Document Expiring Soon",
+            "eventTypes": ["compliance"],
+            "condition": {
+                "daysUntilExpiry": { "$lte": 30, "$gt": 0 }
+            },
+            "severity": "WARNING",
+            "description": "Document expires within 30 days"
+        },
+        {
+            "ruleId": "compliance-invalid",
+            "name": "Invalid Document",
+            "eventTypes": ["compliance"],
+            "condition": {
+                "document_valid": { "$eq": false }
+            },
+            "severity": "CRITICAL",
+            "description": "Document is expired or invalid"
+        },
+        {
+            "ruleId": "idling-moderate",
+            "name": "Moderate Idling",
+            "eventTypes": ["idling"],
+            "condition": {
+                "idleDurationMins": { "$gte": 10, "$lt": 20 }
+            },
+            "severity": "INFO",
+            "description": "Engine idling for 10-20 minutes"
+        },
+        {
+            "ruleId": "idling-excessive",
+            "name": "Excessive Idling",
+            "eventTypes": ["idling"],
+            "condition": {
+                "idleDurationMins": { "$gte": 20 }
+            },
+            "severity": "WARNING",
+            "description": "Engine idling for 20+ minutes"
+        },
+        {
+            "ruleId": "late-arrival",
+            "name": "Late Pickup/Dropoff",
+            "eventTypes": ["late_arrival"],
+            "condition": {
+                "delayMins": { "$gte": 15 }
+            },
+            "severity": "WARNING",
+            "description": "Driver is 15+ minutes late"
+        },
+        {
+            "ruleId": "route-deviation",
+            "name": "Unauthorized Route Deviation",
+            "eventTypes": ["route_deviation"],
+            "condition": {
+                "deviationKm": { "$gte": 2 }
+            },
+            "severity": "WARNING",
+            "description": "Driver deviated 2+ km from assigned route"
+        },
+        {
+            "ruleId": "seatbelt-violation",
+            "name": "Seatbelt Not Worn",
+            "eventTypes": ["seatbelt_violation"],
+            "condition": {
+                "seatbeltStatus": { "$eq": "not_worn" }
+            },
+            "severity": "CRITICAL",
+            "description": "Driver not wearing seatbelt"
+        },
+        {
+            "ruleId": "phone-usage",
+            "name": "Mobile Phone Usage While Driving",
+            "eventTypes": ["phone_usage"],
+            "condition": {
+                "usageDurationSec": { "$gte": 5 }
+            },
+            "severity": "CRITICAL",
+            "description": "Driver using phone for 5+ seconds while driving"
+        },
+        {
+            "ruleId": "fatigue-warning",
+            "name": "Driver Fatigue Detected",
+            "eventTypes": ["fatigue"],
+            "condition": {
+                "fatigueLevel": { "$gte": 3 }
+            },
+            "severity": "WARNING",
+            "description": "Driver showing signs of fatigue (level 3+)"
+        },
+        {
+            "ruleId": "fatigue-critical",
+            "name": "Severe Driver Fatigue",
+            "eventTypes": ["fatigue"],
+            "condition": {
+                "fatigueLevel": { "$gte": 5 }
+            },
+            "severity": "CRITICAL",
+            "description": "Driver showing severe fatigue (level 5+)"
+        },
+        {
+            "ruleId": "accident-report",
+            "name": "Accident Reported",
+            "eventTypes": ["accident"],
+            "condition": {
+                "severity": { "$eq": "major" }
+            },
+            "severity": "CRITICAL",
+            "description": "Major accident reported"
+        },
+        {
+            "ruleId": "maintenance-overdue",
+            "name": "Vehicle Maintenance Overdue",
+            "eventTypes": ["maintenance"],
+            "condition": {
+                "daysOverdue": { "$gte": 7 }
+            },
+            "severity": "WARNING",
+            "description": "Vehicle maintenance is 7+ days overdue"
+        }
+    ],
+    "escalation": {
+        "overspeed": {
+            "escalate_if_count": 2,
+            "window_mins": 30,
+            "escalate_to": "CRITICAL"
+        },
+        "feedback_negative": {
+            "escalate_if_count": 2,
+            "window_mins": 720,
+            "escalate_to": "CRITICAL"
+        },
+        "harsh_brake": {
+            "escalate_if_count": 3,
+            "window_mins": 60,
+            "escalate_to": "CRITICAL"
+        },
+        "fatigue": {
+            "escalate_if_count": 2,
+            "window_mins": 180,
+            "escalate_to": "CRITICAL"
+        }
     },
-    "feedback_negative": {
-        "escalate_if_count": 2,
-        "window_mins": 1440,
-        "escalate_to": "CRITICAL"
-    },
-    "compliance": {
-        "auto_close_if": "document_valid"
+    "auto_close": {
+        "compliance": {
+            "auto_close_if": "document_valid",
+            "check_field": "document_valid"
+        },
+        "idling": {
+            "auto_close_after_mins": 4320,
+            "if_no_repeat": true
+        }
     }
 }

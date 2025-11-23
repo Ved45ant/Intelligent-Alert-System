@@ -18,22 +18,33 @@ export async function loadRules(): Promise<Rules> {
     const raw = await fs.readFile(RULES_PATH, "utf-8");
     const parsed = JSON.parse(raw);
     
-    const allowedKeys = new Set([
-      "escalate_if_count",
-      "window_mins",
-      "escalate_to",
-      "auto_close_if",
-    ]);
-    const sanitized: Rules = {};
-    Object.entries(parsed || {}).forEach(([ruleName, cfg]) => {
-      if (typeof cfg !== "object" || cfg === null) return;
-      const clean: Record<string, any> = {};
-      Object.entries(cfg).forEach(([k, v]) => {
-        if (allowedKeys.has(k)) clean[k] = v;
+    // Support new rules format with rules array and separate escalation/auto_close configs
+    if (parsed.rules && Array.isArray(parsed.rules)) {
+      rulesCache = {
+        rules: parsed.rules,
+        escalation: parsed.escalation || {},
+        auto_close: parsed.auto_close || {}
+      };
+    } else {
+      // Legacy format - keep for backward compatibility
+      const allowedKeys = new Set([
+        "escalate_if_count",
+        "window_mins",
+        "escalate_to",
+        "auto_close_if",
+      ]);
+      const sanitized: Rules = {};
+      Object.entries(parsed || {}).forEach(([ruleName, cfg]) => {
+        if (typeof cfg !== "object" || cfg === null) return;
+        const clean: Record<string, any> = {};
+        Object.entries(cfg).forEach(([k, v]) => {
+          if (allowedKeys.has(k)) clean[k] = v;
+        });
+        sanitized[ruleName] = clean;
       });
-      sanitized[ruleName] = clean;
-    });
-    rulesCache = sanitized;
+      rulesCache = sanitized;
+    }
+    console.log(`✓ Loaded ${Array.isArray(rulesCache.rules) ? rulesCache.rules.length : Object.keys(rulesCache).length} rules`);
     return rulesCache;
   } catch (err) {
     console.error("Failed to load rules.json", err);
@@ -52,7 +63,12 @@ export async function evaluateOnCreate(
   if (!rulesCache || Object.keys(rulesCache).length === 0) {
     await loadRules();
   }
-  const rule = rulesCache[alert.sourceType];
+  
+  // Use escalation config from new format or legacy format
+  const escalationRules = rulesCache.escalation || rulesCache;
+  const autoCloseRules = rulesCache.auto_close || rulesCache;
+  
+  const rule = escalationRules[alert.sourceType];
   if (!rule) return { action: "NONE" };
 
   if (rule.escalate_if_count && rule.window_mins) {
@@ -123,8 +139,10 @@ export async function evaluateOnCreate(
     }
   }
 
-  if (rule.auto_close_if) {
-    const key = rule.auto_close_if;
+  // Check auto-close rules
+  const autoCloseRule = autoCloseRules[alert.sourceType];
+  if (autoCloseRule?.auto_close_if) {
+    const key = autoCloseRule.check_field || autoCloseRule.auto_close_if;
     const shouldAutoClose = 
       alert.metadata?.[key] === true || 
       alert.metadata?.document_valid === true ||

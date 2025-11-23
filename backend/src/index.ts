@@ -12,6 +12,7 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 import eventsRouter from "./routes/events.js";
 import dashboardRouter from "./routes/dashboard.js";
 import debugRouter from "./routes/debug.js";
+import { loadRules } from "./services/ruleEngine.js";
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ let server: any = null;
 async function start() {
   try {
     await connectDB();
+    await loadRules();
     if (process.env.NODE_ENV !== 'test') {
       startWorker();
     }

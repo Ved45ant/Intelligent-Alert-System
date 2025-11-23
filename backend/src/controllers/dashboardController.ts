@@ -171,8 +171,9 @@ export async function getAutoClosed(req: Request, res: Response, next: NextFunct
       lastTransitionReason: a.lastTransitionReason
     }));
 
-    await cache.set(key, result, 30);
-    return res.json(result);
+    const response = { alerts: result };
+    await cache.set(key, response, 30);
+    return res.json(response);
   } catch (err) {
     next(err);
   }

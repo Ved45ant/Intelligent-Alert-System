@@ -61,6 +61,10 @@ export async function fetchRulesOverview() {
   return request("/api/dashboard/rules");
 }
 
+export async function reloadRules() {
+  return request("/api/alerts/rules/reload", { method: "POST" });
+}
+
 export async function fetchAlerts(
   params: { limit?: number; skip?: number } = {}
 ) {
