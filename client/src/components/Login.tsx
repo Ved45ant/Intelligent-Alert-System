@@ -18,8 +18,12 @@ export default function Login({ onLogin }: LoginProps) {
     const token = params.get('token');
     const user = params.get('username');
     const role = params.get('role');
+    const errorParam = params.get('error');
     
-    if (token && user) {
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (token && user) {
       onLogin(token, { username: user, role: role || undefined });
       window.history.replaceState({}, document.title, window.location.pathname);
     }

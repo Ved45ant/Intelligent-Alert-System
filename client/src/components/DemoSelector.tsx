@@ -14,7 +14,7 @@ const DEMOS: DemoOption[] = [
         name: "Overspeed — DRV1001",
         description: "Overspeed event for driver DRV1001 (speed, vehicleId)",
         payload: {
-            alertId: `demo-os-${Date.now()}`,
+            alertId: "demo-os",
             sourceType: "overspeed",
             severity: "WARNING",
             timestamp: new Date().toISOString(),
@@ -30,7 +30,7 @@ const DEMOS: DemoOption[] = [
         name: "Negative Feedback — DRV2002",
         description: "Passenger negative feedback with rating and comments",
         payload: {
-            alertId: `demo-fb-${Date.now()}`,
+            alertId: "demo-fb",
             sourceType: "feedback_negative",
             severity: "INFO",
             timestamp: new Date().toISOString(),
@@ -46,7 +46,7 @@ const DEMOS: DemoOption[] = [
         name: "Compliance — DRV3003",
         description: "Compliance/document check event (docType, expiry)",
         payload: {
-            alertId: `demo-comp-${Date.now()}`,
+            alertId: "demo-comp",
             sourceType: "compliance",
             severity: "INFO",
             timestamp: new Date().toISOString(),
@@ -63,7 +63,7 @@ const DEMOS: DemoOption[] = [
         name: "Harsh Brake — DRV4004",
         description: "Harsh braking event with accel force and location",
         payload: {
-            alertId: `demo-hb-${Date.now()}`,
+            alertId: "demo-hb",
             sourceType: "harsh_brake",
             severity: "WARNING",
             timestamp: new Date().toISOString(),
@@ -79,7 +79,7 @@ const DEMOS: DemoOption[] = [
         name: "Idling — DRV5005",
         description: "Idling event with duration and location",
         payload: {
-            alertId: `demo-idle-${Date.now()}`,
+            alertId: "demo-idle",
             sourceType: "idling",
             severity: "INFO",
             timestamp: new Date().toISOString(),
@@ -91,6 +91,10 @@ const DEMOS: DemoOption[] = [
         },
     },
 ];
+
+function generateUniqueAlertId(prefix: string): string {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
 
 const STORAGE_TYPE = "ias:lastDemoType";
 
@@ -145,6 +149,11 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
         try {
             const payloadSource = customAppliedPayload ?? (editing ? JSON.parse(payloadText) : buildPayload());
             const payload = JSON.parse(JSON.stringify(payloadSource));
+            // Generate unique alertId
+            if (payload.alertId && !payload.alertId.includes('-' + Date.now())) {
+                payload.alertId = generateUniqueAlertId(payload.alertId);
+            }
+            payload.timestamp = new Date().toISOString();
             await createTestAlert(payload);
             if (onCreated) onCreated();
         } catch (err) {
@@ -161,6 +170,14 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
             for (let i = 0; i < Math.max(1, Math.floor(count)); i++) {
                 const payloadSource = customAppliedPayload ?? (editing ? JSON.parse(payloadText) : buildPayload());
                 const payload = JSON.parse(JSON.stringify(payloadSource));
+                // Generate unique alertId for each iteration
+                if (payload.alertId) {
+                    const basePrefix = payload.alertId.split('-')[0] + '-' + payload.alertId.split('-')[1];
+                    payload.alertId = generateUniqueAlertId(basePrefix);
+                }
+                payload.timestamp = new Date().toISOString();
+                // Add small delay to ensure unique timestamps
+                await new Promise(resolve => setTimeout(resolve, 10));
                 await createTestAlert(payload);
             }
             if (onCreated) onCreated();

@@ -37,16 +37,12 @@ if (config.googleClientId && config.googleClientSecret) {
             user = await UserModel.findOne({ email });
 
             if (user) {
+              // Link Google account to existing user
               user.googleId = profile.id;
               await user.save();
             } else {
-              user = new UserModel({
-                googleId: profile.id,
-                email: email,
-                username: email.split("@")[0],
-                role: "admin",
-              });
-              await user.save();
+              // User doesn't exist - reject login
+              return done(new Error("No account found. Please create an account first using email/password, then you can link your Google account."), undefined);
             }
           }
 

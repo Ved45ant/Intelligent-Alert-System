@@ -47,5 +47,7 @@ package-lock.json
 
 # Ignore local VSCode history/session files
 .history/
-# Markups
+
+# Markdown files
+*.md
 *.md
