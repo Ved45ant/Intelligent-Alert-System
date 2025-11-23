@@ -6,7 +6,6 @@ import RulesConfig from './components/RulesConfig';
 import CountsBar from './components/CountsBar';
 import TopDrivers from './components/TopDrivers';
 import AlertList from './components/AlertList';
-import AlertModal from './components/AlertModal';
 import EventsPanel from './components/EventsPanel';
 import DemoSelector from './components/DemoSelector';
 import Login from './components/Login';
@@ -14,6 +13,9 @@ import Login from './components/Login';
 export default function App() {
   const [alerts, setAlerts] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
+  const [reason, setReason] = useState('');
+  const [fullHistory, setFullHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [token, setToken] = useState<string | null>(() => {
     const t = sessionStorage.getItem('token');
     return t && t !== 'null' && t !== 'undefined' ? t : null;
@@ -93,11 +95,29 @@ export default function App() {
   async function handleOpen(alertId: string) {
     const a = await fetchAlertById(alertId);
     setSelected(a);
+    setReason('');
+    
+    // Fetch full history
+    setLoadingHistory(true);
+    try {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_BASE || 'http://localhost:4000'}/api/alerts/${alertId}/history`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      setFullHistory(data.history || []);
+    } catch (err) {
+      console.error('Failed to load history:', err);
+      setFullHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
   }
 
-  async function handleResolve(alertId: string, reason?: string) {
-    await resolveAlertApi(alertId, reason);
+  async function handleResolve(alertId: string, resolveReason?: string) {
+    await resolveAlertApi(alertId, resolveReason);
     setSelected(null);
+    setReason('');
+    setFullHistory([]);
     setTimeout(triggerRefresh, 400);
   }
 
@@ -163,21 +183,61 @@ export default function App() {
                   <div>
                     <div><b>{selected.alertId}</b> <span className={`badge ${selected.severity}`}>{selected.severity}</span></div>
                     <div className="small-muted" style={{ marginTop: 8 }}>{selected.sourceType} • {new Date(selected.timestamp).toLocaleString()}</div>
-                    <div style={{ marginTop: 8 }}>
+                    
+                    <div style={{ marginTop: 10 }}>
+                      <strong>Status: </strong>
+                      <span className={`badge ${selected.status}`}>{selected.status}</span>
+                      {selected.lastTransitionAt && (
+                        <div className="small-muted" style={{ marginTop: 4 }}>
+                          Last transition: {new Date(selected.lastTransitionAt).toLocaleString()} — {selected.lastTransitionReason}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ marginTop: 10 }}>
+                      <strong>Metadata</strong>
                       <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 160, overflow: 'auto' }}>{JSON.stringify(selected.metadata, null, 2)}</pre>
                     </div>
-                    <div style={{ marginTop: 8 }}>
-                      <button className="btn small" onClick={() => handleResolve(selected.alertId, 'resolved via UI')}>Resolve</button>
-                      <button className="btn small" style={{ marginLeft: 8 }} onClick={() => setSelected(null)}>Close</button>
-                    </div>
+
                     <div style={{ marginTop: 10 }}>
-                      <h4 style={{ margin: '8px 0' }}>History</h4>
-                      {selected.history?.map((h: any, i: number) => (
-                        <div key={i} className="row" style={{ justifyContent: 'space-between', padding: 6 }}>
-                          <div>{h.state}</div>
-                          <div className="small-muted">{new Date(h.ts).toLocaleString()}</div>
+                      <strong>Full History (Alert + EventLog)</strong>
+                      {loadingHistory ? (
+                        <div className="small-muted">Loading...</div>
+                      ) : (
+                        <div style={{ maxHeight: 250, overflow: 'auto', border: '1px solid #ccc', borderRadius: 4, padding: 8 }}>
+                          {fullHistory.length === 0 && <div className="small-muted">No history</div>}
+                          {fullHistory.map((h: any, i: number) => (
+                            <div key={i} style={{ borderBottom: '1px solid #eee', paddingBottom: 6, marginBottom: 6 }}>
+                              <div className="row" style={{ justifyContent: 'space-between' }}>
+                                <strong>{h.type || h.state}</strong>
+                                <div className="small-muted">{new Date(h.ts).toLocaleString()}</div>
+                              </div>
+                              {h.reason && <div className="small-muted">Reason: {h.reason}</div>}
+                              {h.payload && <div className="small-muted">Payload: {JSON.stringify(h.payload)}</div>}
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      )}
+                    </div>
+
+                    {selected.status !== 'RESOLVED' && selected.status !== 'AUTO-CLOSED' && (
+                      <div style={{ marginTop: 10 }}>
+                        <strong>Manual Resolve</strong>
+                        <div className="form-row" style={{ marginTop: 8 }}>
+                          <input 
+                            className="input" 
+                            placeholder="reason (optional)" 
+                            value={reason} 
+                            onChange={(e) => setReason(e.target.value)} 
+                            style={{ flex: 1 }}
+                          />
+                          <button className="btn" onClick={() => handleResolve(selected.alertId, reason)} style={{ marginLeft: 8 }}>Resolve</button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: 10 }}>
+                      <button className="btn small" onClick={() => { setSelected(null); setReason(''); setFullHistory([]); }}>Close</button>
                     </div>
                   </div>
                 ) : (
@@ -189,9 +249,6 @@ export default function App() {
         </div>
       </div>
           <EventsPanel />
-          {selected && (
-            <AlertModal alert={selected} onClose={() => setSelected(null)} onResolve={handleResolve} />
-          )}
         </>
       )}
     </div>

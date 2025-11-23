@@ -8,6 +8,7 @@ import * as eventService from "./eventService.js";
 export type Rules = Record<string, any>;
 
 let rulesCache: Rules = {};
+let lastModifiedTime: number = 0;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,6 +16,9 @@ const RULES_PATH = path.resolve(__dirname, "../../rules.json");
 
 export async function loadRules(): Promise<Rules> {
   try {
+    const stats = await fs.stat(RULES_PATH);
+    lastModifiedTime = stats.mtimeMs;
+    
     const raw = await fs.readFile(RULES_PATH, "utf-8");
     const parsed = JSON.parse(raw);
     
@@ -44,7 +48,7 @@ export async function loadRules(): Promise<Rules> {
       });
       rulesCache = sanitized;
     }
-    console.log(`✓ Loaded ${Array.isArray(rulesCache.rules) ? rulesCache.rules.length : Object.keys(rulesCache).length} rules`);
+    console.log(`Loaded ${Array.isArray(rulesCache.rules) ? rulesCache.rules.length : Object.keys(rulesCache).length} rules`);
     return rulesCache;
   } catch (err) {
     console.error("Failed to load rules.json", err);
@@ -55,6 +59,107 @@ export async function loadRules(): Promise<Rules> {
 
 export function getRules(): Rules {
   return rulesCache;
+}
+
+/**
+ * Check if rules.json has been modified and reload if necessary
+ */
+export async function checkAndReloadRules(): Promise<void> {
+  try {
+    const stats = await fs.stat(RULES_PATH);
+    if (stats.mtimeMs > lastModifiedTime) {
+      console.log('Rules file changed, reloading...');
+      await loadRules();
+    }
+  } catch (err) {
+    console.error('Failed to check rules file modification:', err);
+  }
+}
+
+/**
+ * Evaluate an incoming event against the rules array to determine severity
+ */
+export async function evaluateEventAgainstRules(event: any): Promise<{ severity: string; matchedRule?: any }> {
+  // Check if rules have changed and reload if necessary
+  await checkAndReloadRules();
+  
+  if (!rulesCache.rules || !Array.isArray(rulesCache.rules)) {
+    // Legacy format or no rules - return default
+    return { severity: event.severity || "INFO" };
+  }
+
+  const rules = rulesCache.rules;
+  const matchingRules = rules.filter((rule: any) => 
+    rule.eventTypes && rule.eventTypes.includes(event.sourceType)
+  );
+
+  if (matchingRules.length === 0) {
+    return { severity: event.severity || "INFO" };
+  }
+
+  // Check each matching rule's condition
+  for (const rule of matchingRules) {
+    if (evaluateCondition(event.metadata, rule.condition)) {
+      return { severity: rule.severity, matchedRule: rule };
+    }
+  }
+
+  // No conditions matched, return default
+  return { severity: event.severity || "INFO" };
+}
+
+/**
+ * Evaluate if metadata matches a rule condition using MongoDB query operators
+ */
+function evaluateCondition(metadata: any, condition: any): boolean {
+  if (!condition || !metadata) return false;
+
+  for (const [field, operators] of Object.entries(condition)) {
+    const value = metadata[field];
+    
+    if (typeof operators !== 'object' || operators === null) {
+      // Direct equality check
+      if (value !== operators) return false;
+      continue;
+    }
+
+    // Handle MongoDB query operators
+    for (const [op, expected] of Object.entries(operators as any)) {
+      const expectedValue = expected as number | string | boolean;
+      switch (op) {
+        case '$eq':
+          if (value !== expectedValue) return false;
+          break;
+        case '$gte':
+          if (typeof value === 'number' && typeof expectedValue === 'number') {
+            if (value < expectedValue) return false;
+          }
+          break;
+        case '$gt':
+          if (typeof value === 'number' && typeof expectedValue === 'number') {
+            if (value <= expectedValue) return false;
+          }
+          break;
+        case '$lte':
+          if (typeof value === 'number' && typeof expectedValue === 'number') {
+            if (value > expectedValue) return false;
+          }
+          break;
+        case '$lt':
+          if (typeof value === 'number' && typeof expectedValue === 'number') {
+            if (value >= expectedValue) return false;
+          }
+          break;
+        case '$ne':
+          if (value === expectedValue) return false;
+          break;
+        default:
+          console.warn(`Unknown operator: ${op}`);
+      }
+    }
+  }
+
+  return true;
 }
 
 export async function evaluateOnCreate(

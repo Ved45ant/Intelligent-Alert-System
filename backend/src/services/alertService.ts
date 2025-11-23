@@ -1,19 +1,25 @@
 import { AlertModel, IAlert } from "../models/Alert.js";
 import { EventLogModel } from "../models/EventLog.js";
 import * as eventService from "./eventService.js";
-import { evaluateOnCreate } from "./ruleEngine.js";
+import { evaluateOnCreate, evaluateEventAgainstRules } from "./ruleEngine.js";
 
 export async function createAlert(payload: any): Promise<IAlert> {
   const now = new Date();
+  
+  // Evaluate the event against rules to determine correct severity
+  const evaluation = await evaluateEventAgainstRules(payload);
+  
   const toSave = {
     alertId: payload.alertId,
     sourceType: payload.sourceType,
-    severity: payload.severity || "WARNING",
+    severity: evaluation.severity,
     timestamp: payload.timestamp ? new Date(payload.timestamp) : now,
     metadata: payload.metadata || {},
     history: [{ state: "OPEN", ts: now }],
     lastTransitionAt: now,
-    lastTransitionReason: "CREATED",
+    lastTransitionReason: evaluation.matchedRule 
+      ? `MATCHED_RULE:${evaluation.matchedRule.ruleId}` 
+      : "CREATED",
   };
   const created = await AlertModel.create(toSave);
 
