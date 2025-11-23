@@ -1,4 +1,3 @@
-// backend/src/services/ruleEngine.ts
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -10,7 +9,6 @@ export type Rules = Record<string, any>;
 
 let rulesCache: Rules = {};
 
-// Resolve rules.json relative to this file to avoid duplicate path segments.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const RULES_PATH = path.resolve(__dirname, "../../rules.json");
@@ -19,7 +17,7 @@ export async function loadRules(): Promise<Rules> {
   try {
     const raw = await fs.readFile(RULES_PATH, "utf-8");
     const parsed = JSON.parse(raw);
-    // sanitize: only allow known keys per rule
+    
     const allowedKeys = new Set([
       "escalate_if_count",
       "window_mins",
@@ -38,7 +36,6 @@ export async function loadRules(): Promise<Rules> {
     rulesCache = sanitized;
     return rulesCache;
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error("Failed to load rules.json", err);
     rulesCache = {};
     return rulesCache;
@@ -49,10 +46,6 @@ export function getRules(): Rules {
   return rulesCache;
 }
 
-/**
- * Evaluate when a new alert is created.
- * This function may update alert status (e.g., ESCALATED) by appending history and logging.
- */
 export async function evaluateOnCreate(
   alert: IAlert
 ): Promise<{ action: string; details?: any }> {
@@ -62,23 +55,22 @@ export async function evaluateOnCreate(
   const rule = rulesCache[alert.sourceType];
   if (!rule) return { action: "NONE" };
 
-  // Escalation by count in window
   if (rule.escalate_if_count && rule.window_mins) {
     const windowMs = rule.window_mins * 60 * 1000;
     const windowStart = new Date(alert.timestamp.getTime() - windowMs);
     const windowEnd = alert.timestamp;
-    // group key: use metadata.driverId by default, else full metadata match
+    
     const keyFilter: any = { sourceType: alert.sourceType };
     if (alert.metadata?.driverId)
       keyFilter["metadata.driverId"] = alert.metadata.driverId;
-    // count alerts in window
+    
     const count = await alertsService.countAlertsInWindow(
       keyFilter,
       windowStart,
       windowEnd
     );
+    
     if (count >= rule.escalate_if_count) {
-      // escalate matching alerts in this group (idempotent: only update if status != ESCALATED)
       const toEscalate = await AlertModel.find({
         sourceType: alert.sourceType,
         ...(alert.metadata?.driverId
@@ -88,26 +80,27 @@ export async function evaluateOnCreate(
 
       for (const doc of toEscalate) {
         if (doc.status !== "ESCALATED") {
+          const reason = `RULE_COUNT_${rule.escalate_if_count}_IN_${rule.window_mins}MIN`;
           doc.status = "ESCALATED";
+          doc.lastTransitionAt = new Date();
+          doc.lastTransitionReason = reason;
           doc.history.push({
             state: "ESCALATED",
             ts: new Date(),
-            reason: `rule:count:${rule.escalate_if_count}`,
+            reason: reason,
           });
           await doc.save();
-          // log & emit via eventService
+          
           await eventService.logEvent({
             alertId: doc.alertId,
             type: "ESCALATED",
             ts: new Date(),
-            payload: { rule },
+            payload: { rule, reason, actor: "system" },
           });
         }
       }
 
-      // Optionally bump severity on the incoming alert
       if (rule.escalate_to) {
-        // update incoming alert severity if necessary
         if ((alert as any).severity !== rule.escalate_to) {
           const incoming = await AlertModel.findOne({
             alertId: alert.alertId,
@@ -115,7 +108,7 @@ export async function evaluateOnCreate(
           if (incoming) {
             incoming.severity = rule.escalate_to;
             await incoming.save();
-            // Emit a small INFO event about severity change (optional)
+            
             await eventService.logEvent({
               alertId: incoming.alertId,
               type: "INFO",
@@ -130,27 +123,44 @@ export async function evaluateOnCreate(
     }
   }
 
-  // Auto-close if metadata flag present
   if (rule.auto_close_if) {
     const key = rule.auto_close_if;
-    if (alert.metadata && alert.metadata[key] === true) {
-      const doc = await AlertModel.findOne({ alertId: alert.alertId }).exec();
-      if (doc && doc.status !== "AUTO-CLOSED") {
-        doc.status = "AUTO-CLOSED";
-        doc.history.push({
-          state: "AUTO-CLOSED",
-          ts: new Date(),
-          reason: `rule:auto_close:${key}`,
-        });
-        await doc.save();
-        // log & emit
+    const shouldAutoClose = 
+      alert.metadata?.[key] === true || 
+      alert.metadata?.document_valid === true ||
+      alert.metadata?.document_renewed === true;
+      
+    if (shouldAutoClose) {
+      const reason = `DOCUMENT_RENEWED`;
+      const result = await AlertModel.updateOne(
+        {
+          alertId: alert.alertId,
+          status: { $nin: ["AUTO-CLOSED", "RESOLVED"] }
+        },
+        {
+          $set: {
+            status: "AUTO-CLOSED",
+            lastTransitionAt: new Date(),
+            lastTransitionReason: reason
+          },
+          $push: {
+            history: {
+              state: "AUTO-CLOSED",
+              ts: new Date(),
+              reason: reason
+            }
+          }
+        }
+      );
+      
+      if (result.modifiedCount > 0) {
         await eventService.logEvent({
-          alertId: doc.alertId,
+          alertId: alert.alertId,
           type: "AUTO_CLOSED",
           ts: new Date(),
-          payload: { key },
+          payload: { reason, key, actor: "system" },
         });
-        return { action: "AUTO_CLOSE", details: { key } };
+        return { action: "AUTO_CLOSE", details: { key, reason } };
       }
     }
   }
@@ -161,7 +171,6 @@ export async function evaluateOnCreate(
 export async function evaluateAlert(
   alert: IAlert
 ): Promise<{ action: string; details?: any }> {
-  // same logic as evaluateOnCreate but called for existing alert
   return evaluateOnCreate(alert);
 }
 

@@ -1,12 +1,8 @@
-// backend/src/services/alertsService.ts
 import { AlertModel, IAlert } from "../models/Alert.js";
-import { EventLogModel } from "../models/EventLog.js"; // keep for types only if desired
+import { EventLogModel } from "../models/EventLog.js";
 import * as eventService from "./eventService.js";
 import { evaluateOnCreate } from "./ruleEngine.js";
 
-/**
- * Create an alert and evaluate rules for it.
- */
 export async function createAlert(payload: any): Promise<IAlert> {
   const now = new Date();
   const toSave = {
@@ -16,10 +12,11 @@ export async function createAlert(payload: any): Promise<IAlert> {
     timestamp: payload.timestamp ? new Date(payload.timestamp) : now,
     metadata: payload.metadata || {},
     history: [{ state: "OPEN", ts: now }],
+    lastTransitionAt: now,
+    lastTransitionReason: "CREATED",
   };
   const created = await AlertModel.create(toSave);
 
-  // log & emit the CREATED event via central eventService
   await eventService.logEvent({
     alertId: created.alertId,
     type: "CREATED",
@@ -27,7 +24,6 @@ export async function createAlert(payload: any): Promise<IAlert> {
     payload: { metadata: created.metadata },
   });
 
-  // Evaluate rules (may update alert status)
   await evaluateOnCreate(created);
 
   return created;
@@ -59,28 +55,27 @@ export async function resolveAlert(
 ): Promise<IAlert | null> {
   const a = await AlertModel.findOne({ alertId });
   if (!a) return null;
+  const resolveReason = reason || "MANUAL_RESOLVE";
   a.status = "RESOLVED";
+  a.lastTransitionAt = new Date();
+  a.lastTransitionReason = resolveReason;
   a.history.push({
     state: "RESOLVED",
     ts: new Date(),
-    reason: reason || "manual",
+    reason: resolveReason,
   });
   await a.save();
 
-  // log & emit
   await eventService.logEvent({
     alertId: a.alertId,
     type: "RESOLVED",
     ts: new Date(),
-    payload: { reason },
+    payload: { reason: resolveReason, actor: "user" },
   });
 
   return a.toObject() as IAlert;
 }
 
-/**
- * Append a history entry and log event.
- */
 export async function appendHistory(
   alertId: string,
   state: string,
@@ -91,7 +86,6 @@ export async function appendHistory(
   (a as any).history.push({ state, ts: new Date(), reason });
   await a.save();
 
-  // log & emit
   await eventService.logEvent({
     alertId: a.alertId,
     type: state as any,
@@ -100,10 +94,6 @@ export async function appendHistory(
   });
 }
 
-/**
- * Find count of alerts with given filter in time window.
- * Key example: { 'metadata.driverId': 'DR1' }
- */
 export async function countAlertsInWindow(
   filter: Record<string, any>,
   windowStart: Date,

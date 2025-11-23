@@ -2,6 +2,36 @@ import { Request, Response, NextFunction } from 'express';
 import * as alertsService from '../services/alertService.js';
 import { evaluateAlert } from '../services/ruleEngine.js';
 import * as eventService from '../services/eventService.js';
+import { v4 as uuidv4 } from 'uuid';
+
+export async function ingestAlert(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { sourceType, severity, timestamp, metadata } = req.body;
+    
+    if (!sourceType) {
+      return res.status(400).json({ error: 'sourceType is required' });
+    }
+    
+    const normalized = {
+      alertId: req.body.alertId || uuidv4(),
+      sourceType,
+      severity: severity || 'WARNING',
+      timestamp: timestamp ? new Date(timestamp) : new Date(),
+      metadata: metadata || {},
+      status: 'OPEN' as const
+    };
+    
+    const alert = await alertsService.createAlert(normalized);
+    
+    return res.status(201).json({ 
+      alertId: alert.alertId,
+      status: alert.status,
+      severity: alert.severity 
+    });
+  } catch (err) {
+    next(err);
+  }
+}
 
 export async function createAlert(req: Request, res: Response, next: NextFunction) {
   try {
@@ -51,14 +81,12 @@ export async function resolveAlert(req: Request, res: Response, next: NextFuncti
   }
 }
 
-// PATCH /api/alerts/:id/metadata
-// Allows updating metadata (e.g. document renewed) then re-evaluates rules, possibly auto-closing.
 export async function updateAlertMetadata(req: Request, res: Response, next: NextFunction) {
   try {
     const id = req.params.id as string;
     const alert = await alertsService.getAlert(id);
     if (!alert) return res.status(404).json({ error: 'Alert not found' });
-    // merge metadata shallowly
+    
     alert.metadata = { ...alert.metadata, ...(req.body.metadata || {}) };
     await (alert as any).save();
     const result = await evaluateAlert(alert as any);

@@ -114,27 +114,21 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
         try {
             const storedType = localStorage.getItem(STORAGE_TYPE);
             if (storedType && DEMOS.some((d) => d.id === storedType)) setSelectedType(storedType);
-        } catch (err) {
-            // ignore storage errors
-        }
+        } catch (err) {}
     }, []);
 
     useEffect(() => {
         try {
             localStorage.setItem(STORAGE_TYPE, selectedType);
-        } catch (err) {
-            // ignore
-        }
+        } catch (err) {}
     }, [selectedType]);
 
     const selected = DEMOS.find((d) => d.id === selectedType) || DEMOS[0];
 
-    // Deep clone the demo payload so we don't accidentally mutate DEMOS
     function buildPayload() {
         return JSON.parse(JSON.stringify(selected.payload || {}));
     }
 
-    // Synchronize payloadText when not editing and when custom payload changes
     useEffect(() => {
         if (editing) return;
         if (customAppliedPayload) {
@@ -142,7 +136,6 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
             return;
         }
         setPayloadText(pretty(buildPayload()));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedType, editing, customAppliedPayload]);
 
     const previewPayload = customAppliedPayload ?? buildPayload();
@@ -151,11 +144,10 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
         setBusy(true);
         try {
             const payloadSource = customAppliedPayload ?? (editing ? JSON.parse(payloadText) : buildPayload());
-            const payload = JSON.parse(JSON.stringify(payloadSource)); // clone
+            const payload = JSON.parse(JSON.stringify(payloadSource));
             await createTestAlert(payload);
             if (onCreated) onCreated();
         } catch (err) {
-            // eslint-disable-next-line no-console
             console.error("Failed to create demo alert", err);
             alert("Failed to create demo alert");
         } finally {
@@ -168,13 +160,11 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
         try {
             for (let i = 0; i < Math.max(1, Math.floor(count)); i++) {
                 const payloadSource = customAppliedPayload ?? (editing ? JSON.parse(payloadText) : buildPayload());
-                const payload = JSON.parse(JSON.stringify(payloadSource)); // clone per iteration
-                // eslint-disable-next-line no-await-in-loop
+                const payload = JSON.parse(JSON.stringify(payloadSource));
                 await createTestAlert(payload);
             }
             if (onCreated) onCreated();
         } catch (err) {
-            // eslint-disable-next-line no-console
             console.error("Failed creating multiple demo alerts", err);
             alert("Failed creating demo alerts");
         } finally {
@@ -184,7 +174,6 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
 
     return (
         <div className="demo-selector" style={{ width: "100%" }}>
-            {/* Top: Choose demo */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                 <span style={{ fontSize: 13, fontWeight: 600 }}>Choose demo:</span>
                 <select
@@ -292,9 +281,8 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
                             try {
                                 const parsed = JSON.parse(payloadText.replace(/\r\n/g, "\n"));
                                 setCustomAppliedPayload(parsed);
-                                setPayloadText(pretty(parsed)); // keep textarea formatted
+                                setPayloadText(pretty(parsed));
                                 setEditing(false);
-                                // eslint-disable-next-line no-console
                                 console.log("Custom payload applied");
                             } catch (err) {
                                 alert("Invalid JSON: " + err);

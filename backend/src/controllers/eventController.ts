@@ -1,4 +1,3 @@
-// backend/src/controllers/eventController.ts
 import { Request, Response, NextFunction } from "express";
 import * as eventService from "../services/eventService.js";
 

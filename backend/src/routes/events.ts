@@ -1,42 +1,20 @@
-// backend/src/routes/events.ts
 import { Router } from "express";
 import * as eventController from "../controllers/eventController.js";
 import { getEmitter } from "../services/eventEmitter.js";
 import rateLimit from "express-rate-limit";
 import { authMiddleware } from "../middlewares/auth.js";
+import { EventLogModel } from "../models/EventLog.js";
 
 const router = Router();
 
-// Rate limiter for SSE to prevent abuse
 const sseLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // limit each IP to 10 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   message: "Too many SSE connections from this IP, please try again later.",
 });
 
-/**
- * GET /api/events
- * Query params:
- *  - alertId
- *  - type (CREATED|ESCALATED|AUTO_CLOSED|RESOLVED|INFO)
- *  - since (ISO date)
- *  - until (ISO date)
- *  - limit, skip
- */
 router.get("/", authMiddleware(), eventController.listEvents);
-
-/**
- * GET /api/events/counts
- * Optional query: since, until
- */
 router.get("/counts", authMiddleware(), eventController.eventCounts);
-
-/**
- * GET /api/events/export (admin only)
- * Optional query params: alertId, type, since, until, limit (default 500)
- * Returns CSV with columns: alertId,type,ts,payload_json
- */
-import { EventLogModel } from "../models/EventLog.js";
 router.get("/export", authMiddleware(["admin"]), async (req, res, next) => {
   try {
     const { alertId, type, since, until, limit } = req.query as Record<string, string>;
@@ -65,20 +43,12 @@ router.get("/export", authMiddleware(["admin"]), async (req, res, next) => {
   }
 });
 
-/**
- * Server-Sent Events endpoint — /api/events/stream
- * Stream recent events to connected clients.
- *
- * Note: simple in-memory emitter. Not suitable for multi-node production (requires Redis/WS).
- */
 router.get("/stream", authMiddleware(), sseLimiter, (req, res) => {
-  // Set headers for SSE
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders?.();
 
-  // send a ping / initial event
   res.write(
     `event: connected\ndata: ${JSON.stringify({
       ts: new Date().toISOString(),
@@ -89,14 +59,11 @@ router.get("/stream", authMiddleware(), sseLimiter, (req, res) => {
   const listener = (ev: any) => {
     try {
       res.write(`event: event\ndata: ${JSON.stringify(ev)}\n\n`);
-    } catch (e) {
-      // ignore write errors
-    }
+    } catch (e) {}
   };
 
   emitter.on("event", listener);
 
-  // when client disconnects, remove listener
   req.on("close", () => {
     emitter.off("event", listener);
   });

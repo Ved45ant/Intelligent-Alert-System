@@ -10,6 +10,9 @@ export interface IAlert extends Document {
   status: AlertStatus;
   metadata: Record<string, any>;
   history: Array<{ state: AlertStatus; ts: Date; reason?: string }>;
+  expiryTimestamp?: Date;
+  lastTransitionAt?: Date;
+  lastTransitionReason?: string;
 }
 
 const AlertSchema = new Schema<IAlert>({
@@ -20,12 +23,12 @@ const AlertSchema = new Schema<IAlert>({
   status: { type: String, required: true, default: "OPEN" },
   metadata: { type: Schema.Types.Mixed, default: {} },
   history: [{ state: String, ts: Date, reason: String }],
+  expiryTimestamp: { type: Date },
+  lastTransitionAt: { type: Date },
+  lastTransitionReason: { type: String },
 });
 
-// Additional indexes
-AlertSchema.index({ status: 1, timestamp: -1 }); // for worker queries
-AlertSchema.index({ "metadata.driverId": 1, sourceType: 1, timestamp: -1 }); // for rule evaluation
+AlertSchema.index({ status: 1, timestamp: -1 });
+AlertSchema.index({ "metadata.driverId": 1, sourceType: 1, timestamp: -1 });
 
-// static-like helper (attached after model creation in services)
-// but we export the model for service use:
 export const AlertModel = model<IAlert>("Alert", AlertSchema);

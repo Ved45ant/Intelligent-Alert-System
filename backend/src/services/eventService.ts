@@ -1,10 +1,7 @@
-// backend/src/services/eventService.ts
 import { EventLogModel, IEventLog } from "../models/EventLog.js";
 import { emitEvent, OutgoingEvent } from "./eventEmitter.js";
+import * as cache from "../lib/cache.js";
 
-/**
- * Log an event in DB and emit it to in-memory listeners.
- */
 export async function logEvent(payload: {
   alertId: string;
   type: "CREATED" | "ESCALATED" | "AUTO_CLOSED" | "RESOLVED" | "INFO";
@@ -25,15 +22,15 @@ export async function logEvent(payload: {
     payload: doc.payload || {},
   };
 
-  // emit to in-process listeners (SSE clients)
   emitEvent(outgoing);
+
+  try {
+    await cache.delPattern('dashboard:*');
+  } catch (e) {}
 
   return doc;
 }
 
-/**
- * Existing fetchEvents function (unchanged).
- */
 export async function fetchEvents(query: any = {}): Promise<IEventLog[]> {
   const q: any = {};
   if (query.alertId) q.alertId = query.alertId;

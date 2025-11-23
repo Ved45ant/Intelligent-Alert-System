@@ -7,26 +7,25 @@ import { createAlertSchema } from "../utils/validation.js";
 
 const router = Router();
 
-// All alert routes now require a valid JWT
-
-// Create alert
+router.post("/ingest", authMiddleware(), alertController.ingestAlert);
 router.post("/", authMiddleware(), validateBody(createAlertSchema), alertController.createAlert);
-
-// Get alert by alertId
 router.get("/:id", authMiddleware(), alertController.getAlert);
 
-// List alerts (query params support)
+router.get("/:id/history", authMiddleware(), async (req, res, next) => {
+  const dashboardController = await import('../controllers/dashboardController.js');
+  return dashboardController.getAlertHistory(req, res, next);
+});
+
+router.get("/auto-closed", authMiddleware(), async (req, res, next) => {
+  const dashboardController = await import('../controllers/dashboardController.js');
+  return dashboardController.getAutoClosed(req, res, next);
+});
+
 router.get("/", authMiddleware(), alertController.listAlerts);
-
-// Resolve an alert (manual)
 router.post("/:id/resolve", authMiddleware(), alertController.resolveAlert);
-
-// Update alert metadata then re-evaluate rules
 router.patch("/:id/metadata", authMiddleware(), alertController.updateAlertMetadata);
 
-// Rules endpoints
 router.get("/rules/list", authMiddleware(["admin"]), (_, res) => {
-  // return sanitized in-memory rules
   res.json(getRules());
 });
 

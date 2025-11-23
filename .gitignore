@@ -1,0 +1,51 @@
+# Node
+node_modules/
+
+# Build outputs
+dist/
+build/
+lib/
+
+# TypeScript
+*.tsbuildinfo
+
+# Env files (do not commit secrets)
+.env
+.env.local
+.env.*.local
+.env.*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Vite & cache
+.node_modules/.vite/
+.cache/
+
+# Coverage
+coverage/
+coverage-*.json
+
+# Misc
+*.pid
+*.seed
+*.gz
+
+# Local npm/global files
+.pnpm-debug.log
+package-lock.json
+
+# Ignore local VSCode history/session files
+.history/
+# Markups
+*.md

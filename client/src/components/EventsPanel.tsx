@@ -1,4 +1,3 @@
-// client/src/components/EventsPanel.tsx
 import { useEffect, useState, useRef } from 'react';
 import { fetchEvents, fetchEventCounts } from '../api/api';
 
@@ -21,7 +20,6 @@ export default function EventsPanel() {
     useEffect(() => {
         load();
 
-        // connect SSE
         if (!evtRef.current) {
             const base = import.meta.env.VITE_BACKEND_BASE || 'http://localhost:5001';
             const token = sessionStorage.getItem('token');
@@ -29,14 +27,10 @@ export default function EventsPanel() {
             const es = new EventSource(url);
             evtRef.current = es;
             es.onmessage = (evt) => {
-                // default event (some servers send plain messages)
                 try {
                     const data = JSON.parse(evt.data);
-                    // push to top
                     setEvents((prev) => [data, ...prev].slice(0, 200));
-                } catch (e) {
-                    // ignore parse errors
-                }
+                } catch (e) {}
             };
             es.addEventListener('event', (ev: any) => {
                 try {
@@ -45,17 +39,14 @@ export default function EventsPanel() {
                 } catch (e) { }
             });
 
-            es.onerror = () => {
-                // reconnect logic could be added here
-            };
+            es.onerror = () => {};
         }
 
         const id = setInterval(async () => {
-            // refresh counts periodically (SSE gives events but counts may need aggregation)
             try {
                 const c = await fetchEventCounts();
                 setCounts(c || {});
-            } catch (e) { }
+            } catch (e) {}
         }, 8000);
 
         return () => {

@@ -1,7 +1,12 @@
 const BASE = import.meta.env.VITE_BACKEND_BASE || "http://localhost:5001";
 
 async function request(path: string, opts: RequestInit = {}) {
-  const token = sessionStorage.getItem("token");
+  let token = sessionStorage.getItem("token");
+  if (token === 'null' || token === 'undefined') {
+    token = null;
+    sessionStorage.removeItem('token');
+  }
+  console.log("Making request to:", path, "Token:", token ? token.slice(0, 20) + "..." : "none");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((opts.headers as Record<string, string>) || {}),
@@ -12,15 +17,11 @@ async function request(path: string, opts: RequestInit = {}) {
     headers,
   });
   if (!res.ok) {
-    // If unauthorized, clear token and reload to show login page
     if (res.status === 401) {
       try {
         sessionStorage.removeItem("token");
         localStorage.removeItem("token");
-      } catch (e) {
-        // ignore
-      }
-      // reload to show login UI
+      } catch (e) {}
       window.location.reload();
     }
     const txt = await res.text();
@@ -38,7 +39,6 @@ export async function createTestAlert(payload: any) {
 
 export async function fetchSummary() {
   const res = await request("/api/dashboard/summary");
-  // map backend keys to existing structure
   return {
     critical: res.counts?.CRITICAL || 0,
     warning: res.counts?.WARNING || 0,
@@ -92,7 +92,8 @@ export async function fetchEvents(
 }
 
 export async function loginApi(credentials: {
-  username: string;
+  email?: string;
+  username?: string;
   password: string;
 }) {
   return request("/api/auth/login", {
@@ -106,7 +107,8 @@ export async function getMe() {
 }
 
 export async function createAdminApi(credentials: {
-  username: string;
+  email: string;
+  username?: string;
   password: string;
 }) {
   return request("/api/auth/create-admin", {

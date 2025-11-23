@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { fetchSummary, fetchAlerts, fetchAlertById, resolveAlertApi, fetchAutoClosed, fetchTrends, fetchRulesOverview, getMe } from './api/api';
+import { useEffect, useState } from 'react';
+import { fetchAlerts, fetchAlertById, resolveAlertApi, fetchRulesOverview, getMe } from './api/api';
 import AutoClosedList from './components/AutoClosedList';
-import TrendsChart from './components/TrendsChart';
+import TrendsChartContainer from './components/TrendsChartContainer';
 import RulesConfig from './components/RulesConfig';
 import CountsBar from './components/CountsBar';
+import TopDrivers from './components/TopDrivers';
 import AlertList from './components/AlertList';
 import AlertModal from './components/AlertModal';
 import EventsPanel from './components/EventsPanel';
@@ -11,40 +12,36 @@ import DemoSelector from './components/DemoSelector';
 import Login from './components/Login';
 
 export default function App() {
-  const [summary, setSummary] = useState<{ critical: number; warning: number; info: number; topDrivers?: any[] }>({ critical: 0, warning: 0, info: 0 });
   const [alerts, setAlerts] = useState<any[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [token, setToken] = useState<string | null>(sessionStorage.getItem('token'));
+  const [token, setToken] = useState<string | null>(() => {
+    const t = sessionStorage.getItem('token');
+    return t && t !== 'null' && t !== 'undefined' ? t : null;
+  });
   const [user, setUser] = useState<any | null>(() => {
     const u = sessionStorage.getItem('username');
     const r = sessionStorage.getItem('role');
-    return u ? { username: u, role: r } : null;
+    return u && u !== 'null' ? { username: u, role: r } : null;
   });
-  const [autoClosed, setAutoClosed] = useState<any[]>([]);
-  const [trends, setTrends] = useState<Record<string, { created:number; escalated:number; autoClosed:number; resolved:number; info:number }>>({});
   const [rules, setRules] = useState<Record<string, any>>({});
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  async function loadAll() {
-    setLoading(true);
+  async function loadAlerts() {
     try {
-      const s = await fetchSummary();
-      setSummary(s);
       const list = await fetchAlerts({ limit: 50 });
       setAlerts(list);
-      const ac = await fetchAutoClosed(24);
-      setAutoClosed(ac.rows || []);
-      const tr = await fetchTrends(7);
-      setTrends(tr.data || {});
       if (user?.role === 'admin') {
         try { const r = await fetchRulesOverview(); setRules(r); } catch {}
       }
     } catch (err) {
       console.error(err);
       alert('Failed to load data. Is backend running?');
-    } finally {
-      setLoading(false);
     }
+  }
+
+  function triggerRefresh() {
+    setRefreshKey(k => k + 1);
+    loadAlerts();
   }
 
   useEffect(() => {
@@ -52,21 +49,18 @@ export default function App() {
     async function init() {
       if (!token) return;
       try {
-        // verify token with backend before making protected requests
         const me = await getMe();
         if (!mounted) return;
         setUser(me);
       } catch (err) {
-        // token invalid — clear and show login
         console.warn('Token invalid or expired, clearing session', err);
         sessionStorage.removeItem('token');
         setToken(null);
         setUser(null);
         return;
       }
-      // token ok, load data and start periodic refresh
-      loadAll();
-      const id = setInterval(loadAll, 8000);
+      loadAlerts();
+      const id = setInterval(loadAlerts, 8000);
       return () => clearInterval(id);
     }
     const maybeCleanup = init();
@@ -77,6 +71,10 @@ export default function App() {
   }, [token]);
 
   function handleLogin(newToken: string, newUser: any) {
+    if (!newToken || newToken === 'null' || newToken === 'undefined') {
+      console.error('Invalid token received:', newToken);
+      return;
+    }
     setToken(newToken);
     setUser(newUser);
     sessionStorage.setItem('token', newToken);
@@ -100,7 +98,7 @@ export default function App() {
   async function handleResolve(alertId: string, reason?: string) {
     await resolveAlertApi(alertId, reason);
     setSelected(null);
-    setTimeout(loadAll, 400);
+    setTimeout(triggerRefresh, 400);
   }
 
   return (
@@ -115,14 +113,14 @@ export default function App() {
               <div className="small-muted">Logged in as {user?.username} ({user?.role})</div>
             </div>
             <div className="row">
-              <DemoSelector onCreated={() => setTimeout(loadAll, 700)} />
-              <button className="btn small" onClick={loadAll} style={{ marginLeft: 8 }}>Refresh</button>
+              <DemoSelector onCreated={() => setTimeout(triggerRefresh, 700)} />
+              <button className="btn small" onClick={triggerRefresh} style={{ marginLeft: 8 }}>Refresh</button>
               <button className="btn small" onClick={handleLogout} style={{ marginLeft: 8 }}>Logout</button>
             </div>
           </div>
 
       <div className="card">
-        <CountsBar summary={summary} loading={loading} />
+        <CountsBar key={refreshKey} />
         <div style={{ marginTop: 12 }} className="grid">
           <div>
             <div className="card" style={{ marginBottom: 8 }}>
@@ -132,31 +130,17 @@ export default function App() {
               </div>
             </div>
             <div className="card" style={{ marginTop: 12 }}>
-              <h3 style={{ margin: 0 }}>Top Drivers</h3>
-              <div style={{ paddingTop: 8 }} className="small-muted">
-                {summary.topDrivers && summary.topDrivers.length > 0 ? (
-                  <div>
-                    {summary.topDrivers.map((d:any) => (
-                      <div key={d.driverId} className="row" style={{ justifyContent:'space-between', padding:4 }}>
-                        <div>{d.driverId}</div>
-                        <div className="small-muted">{d.count} alerts</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : <div className="small-muted">No driver data.</div>}
-              </div>
+              <TopDrivers key={refreshKey} />
             </div>
             <div className="card" style={{ marginTop: 12 }}>
-              <h3 style={{ margin: 0 }}>Recent Auto-CLOSED (24h)</h3>
-              <AutoClosedList rows={autoClosed} />
+              <AutoClosedList key={refreshKey} />
             </div>
             <div className="card" style={{ marginTop: 12 }}>
-              <h3 style={{ margin: 0 }}>Trends (7d)</h3>
-              <TrendsChart data={trends} />
+              <TrendsChartContainer key={refreshKey} />
             </div>
             {user?.role === 'admin' && (
               <div className="card" style={{ marginTop: 12 }}>
-                <RulesConfig rules={rules} canReload={true} onReload={async () => { await fetch('/api/alerts/rules/reload', { method:'POST', headers:{ Authorization:`Bearer ${token}` } }); setTimeout(loadAll,500); }} />
+                <RulesConfig rules={rules} canReload={true} onReload={async () => { await fetch('/api/alerts/rules/reload', { method:'POST', headers:{ Authorization:`Bearer ${token}` } }); setTimeout(triggerRefresh,500); }} />
               </div>
             )}
           </div>

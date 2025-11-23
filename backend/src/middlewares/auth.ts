@@ -13,15 +13,16 @@ interface JwtPayload {
 export function authMiddleware(requiredRoles?: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     let header = req.headers.authorization as string | undefined;
-    // Support token in query param for EventSource (SSE) clients: ?token=...
+    
     if (!header && (req as any).query && (req as any).query.token) {
       header = `Bearer ${(req as any).query.token}`;
-      // also set it on headers so downstream code can read it
       req.headers.authorization = header;
     }
 
-    if (!header || !header.startsWith("Bearer "))
+    if (!header || !header.startsWith("Bearer ")) {
+      console.log("Auth failed: missing or invalid header", { header, path: req.path });
       return res.status(401).json({ error: "missing token" });
+    }
 
     const token = header.slice(7);
     try {
@@ -32,14 +33,16 @@ export function authMiddleware(requiredRoles?: string[]) {
         requiredRoles.length > 0 &&
         !requiredRoles.includes(payload.role)
       ) {
+        console.log("Auth failed: role forbidden", { required: requiredRoles, actual: payload.role });
         return res.status(403).json({ error: "forbidden" });
       }
       next();
     } catch (err) {
-      // log non-sensitive verification failure for debugging
-      // Do not log the token value itself
-      // eslint-disable-next-line no-console
-      console.debug("auth: token verification failed:", (err as Error).message);
+      console.log("Auth failed: token verification error", { 
+        message: (err as Error).message, 
+        jwtSecret: config.jwtSecret.slice(0, 10) + "...",
+        tokenStart: token.slice(0, 20) + "..."
+      });
       return res.status(401).json({ error: "invalid token" });
     }
   };
