@@ -37,7 +37,6 @@ export default function Login({ onLogin }: LoginProps) {
       const res = isCreate 
         ? await createAdminApi({ email, username: username || undefined, password }) 
         : await loginApi({ email: email || undefined, username: username || undefined, password });
-      console.log("Login response:", res);
       
       if (isCreate) {
         alert("Admin created. Now login.");

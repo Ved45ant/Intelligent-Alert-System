@@ -59,6 +59,7 @@ export async function listAlerts(req: Request, res: Response, next: NextFunction
     const filters = {
       status: req.query.status as string | undefined,
       sourceType: req.query.sourceType as string | undefined,
+      severity: req.query.severity as string | undefined,
       driverId: req.query.driverId as string | undefined,
       limit: Number(req.query.limit || 50),
       skip: Number(req.query.skip || 0)

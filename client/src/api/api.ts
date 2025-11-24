@@ -6,7 +6,6 @@ async function request(path: string, opts: RequestInit = {}) {
     token = null;
     sessionStorage.removeItem('token');
   }
-  console.log("Making request to:", path, "Token:", token ? token.slice(0, 20) + "..." : "none");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...((opts.headers as Record<string, string>) || {}),
@@ -66,11 +65,12 @@ export async function reloadRules() {
 }
 
 export async function fetchAlerts(
-  params: { limit?: number; skip?: number } = {}
+  params: { limit?: number; skip?: number; severity?: string } = {}
 ) {
   const q = new URLSearchParams();
   if (params.limit) q.set("limit", String(params.limit));
   if (params.skip) q.set("skip", String(params.skip));
+   if (params.severity) q.set("severity", params.severity);
   return request(`/api/alerts?${q.toString()}`);
 }
 

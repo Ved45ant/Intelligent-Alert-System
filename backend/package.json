@@ -6,7 +6,8 @@
     "dev": "nodemon --watch src --ext ts --exec \"node --import tsx src/index.ts\"",
     "dev:simple": "node --import tsx --watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "docx": "node scripts/generate-docx.mjs"
   },
   "dependencies": {
     "@types/helmet": "^0.0.48",
@@ -34,6 +35,7 @@
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/uuid": "^9.0.7",
+    "docx": "^8.5.0",
     "nodemon": "^3.0.1",
     "tsx": "^4.19.2",
     "typescript": "^5.9.3"

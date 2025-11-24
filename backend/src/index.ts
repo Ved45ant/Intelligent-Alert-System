@@ -11,7 +11,6 @@ import { startWorker } from "./services/worker.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import eventsRouter from "./routes/events.js";
 import dashboardRouter from "./routes/dashboard.js";
-import debugRouter from "./routes/debug.js";
 import { loadRules } from "./services/ruleEngine.js";
 
 dotenv.config();
@@ -34,9 +33,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/events", eventsRouter);
 app.use('/api/dashboard', dashboardRouter);
 
-if (process.env.NODE_ENV !== 'production') {
-  app.use('/api/debug', debugRouter);
-}
+// debug routes removed for a cleaner case-study submission
 
 app.use(errorHandler);
 

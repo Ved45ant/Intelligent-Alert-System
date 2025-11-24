@@ -48,7 +48,7 @@ export async function loadRules(): Promise<Rules> {
       });
       rulesCache = sanitized;
     }
-    console.log(`Loaded ${Array.isArray(rulesCache.rules) ? rulesCache.rules.length : Object.keys(rulesCache).length} rules`);
+    // rules loaded
     return rulesCache;
   } catch (err) {
     console.error("Failed to load rules.json", err);
@@ -68,7 +68,7 @@ export async function checkAndReloadRules(): Promise<void> {
   try {
     const stats = await fs.stat(RULES_PATH);
     if (stats.mtimeMs > lastModifiedTime) {
-      console.log('Rules file changed, reloading...');
+      // rules file changed
       await loadRules();
     }
   } catch (err) {

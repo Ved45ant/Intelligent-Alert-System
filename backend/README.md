@@ -1,63 +1,61 @@
-# Intelligent Alert Escalation & Resolution System - Backend
+# Intelligent Alert System – Backend
 
-## Overview
-This is the backend for an Intelligent Alert Escalation & Resolution System built with Node.js, Express, TypeScript, and MongoDB. It handles alert creation, rule-based escalation, event logging, and provides APIs for a frontend dashboard.
+Small Node.js + Express + TypeScript service for creating alerts from events, deciding severity with simple rules, and exposing REST APIs for a React dashboard. Keeps things practical and easy to read.
 
-## Features
-- Alert creation with metadata
-- Rule engine for automatic escalation and auto-close based on JSON rules
-- Background worker for periodic rule evaluation
-- JWT-based authentication
-- Server-Sent Events (SSE) for real-time updates
-- RESTful APIs for alerts, events, dashboard summary
+## What it does
+- Creates alerts with metadata and severity
+- Applies JSON rules to set severity, escalate, or auto‑close
+- Runs a background worker on a schedule (expiry, reevaluation)
+- Logs a simple event history for each alert
+- Exposes minimal REST endpoints used by the frontend
 
-## Setup
-1. Install dependencies: `npm install`
-2. Set environment variables in `.env`:
-   - `MONGO_URI`: MongoDB connection string
-   - `JWT_SECRET`: Secret for JWT tokens
-   - `PORT`: Server port (default 5001)
-   - `WORKER_CRON`: Cron expression for worker (default */2 * * * *)
-3. Run in development: `npm run dev`
-4. Build for production: `npm run build` then `npm start`
+## Quick start
+```bash
+npm install
+npm run dev
+```
+Defaults: server on `http://localhost:5001`, MongoDB on local instance. Make sure MongoDB is running or set a connection string.
 
-## API Endpoints
-- `POST /api/auth/login` - Login
-- `POST /api/auth/create-admin` - Create admin user
-- `POST /api/alerts` - Create alert
-- `GET /api/alerts` - List alerts
-- `GET /api/alerts/:id` - Get alert by ID
-- `POST /api/alerts/:id/resolve` - Resolve alert
-- `GET /api/alerts/rules/list` - List rules
-- `POST /api/alerts/rules/reload` - Reload rules (admin only)
-- `GET /api/events` - List events
-- `GET /api/events/counts` - Event counts
-- `GET /api/events/stream` - SSE stream
-- `GET /api/dashboard/summary` - Dashboard summary
+## Minimal env (.env)
+- `MONGO_URI` – MongoDB connection (default local)
+- `PORT` – API port (default 5001)
+- `ALERT_EXPIRY_HOURS` – auto‑close age window (default 24)
+- `WORKER_CRON` – cron for worker (default `*/2 * * * *`)
 
-## Rules Configuration
-Rules are defined in `rules.json`. Example:
+## Core endpoints (short)
+- `GET /health` – service check
+- `GET /api/alerts` – list alerts (supports `severity`, `sourceType`, etc.)
+- `GET /api/alerts/:id` – alert details
+- `POST /api/alerts` – create alert
+- `POST /api/alerts/:id/resolve` – resolve alert
+- `POST /api/alerts/rules/reload` – reload rules (admin)
+
+## Rules (simple example)
+Rules live in `rules.json`. New format supports an array plus escalation/auto‑close sections:
 ```json
 {
-  "overspeed": {
-    "escalate_if_count": 3,
-    "window_mins": 60,
-    "escalate_to": "CRITICAL"
+  "rules": [
+    {
+      "ruleId": "speed_high",
+      "eventTypes": ["driver"],
+      "severity": "CRITICAL",
+      "condition": { "speed": { "$gt": 120 } }
+    }
+  ],
+  "escalation": {
+    "driver": { "escalate_if_count": 5, "window_mins": 10, "escalate_to": "CRITICAL" }
+  },
+  "auto_close": {
+    "document": { "auto_close_if": "document_valid", "check_field": "document_valid" }
   }
 }
 ```
+The app hot‑reloads rules if the file changes.
 
-## Testing
-Run tests with `npm test`.
+## Worker (background)
+Runs on the cron set in `WORKER_CRON` (default every 2 minutes):
+- Auto‑closes alerts older than `ALERT_EXPIRY_HOURS` (if still open)
+- Re‑evaluates alerts for escalation/auto‑close
 
-## Security
-- Passwords are hashed with bcrypt
-- JWT tokens for auth
-- Rate limiting on sensitive endpoints
-- Input validation with Zod
-
-## Production Notes
-- Use a production MongoDB instance
-- Set strong JWT_SECRET
-- Consider Redis for SSE in multi-node setup
-- Monitor worker performance
+## Auth (basic)
+JWT‑style auth is supported for protected routes. For the case study, the focus is the alert flow; keep secrets in `.env`.

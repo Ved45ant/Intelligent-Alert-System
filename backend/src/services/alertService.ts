@@ -45,6 +45,7 @@ export async function listAlerts(filters: any): Promise<IAlert[]> {
   const q: any = {};
   if (filters.status) q.status = filters.status;
   if (filters.sourceType) q.sourceType = filters.sourceType;
+  if (filters.severity) q.severity = filters.severity;
   if (filters.driverId) q["metadata.driverId"] = filters.driverId;
   const list = (await AlertModel.find(q)
     .sort({ timestamp: -1 })

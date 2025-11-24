@@ -20,7 +20,6 @@ export function authMiddleware(requiredRoles?: string[]) {
     }
 
     if (!header || !header.startsWith("Bearer ")) {
-      console.log("Auth failed: missing or invalid header", { header, path: req.path });
       return res.status(401).json({ error: "missing token" });
     }
 
@@ -33,16 +32,10 @@ export function authMiddleware(requiredRoles?: string[]) {
         requiredRoles.length > 0 &&
         !requiredRoles.includes(payload.role)
       ) {
-        console.log("Auth failed: role forbidden", { required: requiredRoles, actual: payload.role });
         return res.status(403).json({ error: "forbidden" });
       }
       next();
     } catch (err) {
-      console.log("Auth failed: token verification error", { 
-        message: (err as Error).message, 
-        jwtSecret: config.jwtSecret.slice(0, 10) + "...",
-        tokenStart: token.slice(0, 20) + "..."
-      });
       return res.status(401).json({ error: "invalid token" });
     }
   };

@@ -509,7 +509,6 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
                 </span>
             </div>
 
-            {/* Middle: Edit/Preview payload header */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <input type="checkbox" checked={editing} onChange={(e) => setEditing(e.target.checked)} />
@@ -598,7 +597,6 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
                                 setCustomAppliedPayload(parsed);
                                 setPayloadText(pretty(parsed));
                                 setEditing(false);
-                                console.log("Custom payload applied");
                             } catch (err) {
                                 alert("Invalid JSON: " + err);
                             }
@@ -609,7 +607,6 @@ export default function DemoSelector({ onCreated }: { onCreated?: () => void }) 
                 </div>
             </div>
 
-            {/* Bottom: Post actions */}
             <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
                 <button className="btn primary" onClick={handleCreateDemoOnce} disabled={busy} style={{ minWidth: 140 }}>
                     Post demo alert

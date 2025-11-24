@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { fetchAlerts, fetchAlertById, resolveAlertApi, fetchRulesOverview, getMe, reloadRules } from './api/api';
 import AutoClosedList from './components/AutoClosedList';
 import TrendsChartContainer from './components/TrendsChartContainer';
@@ -27,10 +27,18 @@ export default function App() {
   });
   const [rules, setRules] = useState<Record<string, any>>({});
   const [refreshKey, setRefreshKey] = useState(0);
+  const [severityFilter, setSeverityFilter] = useState<string | 'ALL'>('ALL');
+  const severityFilterRef = useRef(severityFilter);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    severityFilterRef.current = severityFilter;
+  }, [severityFilter]);
 
   async function loadAlerts() {
     try {
-      const list = await fetchAlerts({ limit: 50 });
+      const currentFilter = severityFilterRef.current;
+      const list = await fetchAlerts({ limit: 50, severity: currentFilter === 'ALL' ? undefined : currentFilter });
       setAlerts(list);
       if (user?.role === 'admin') {
         try { const r = await fetchRulesOverview(); setRules(r); } catch {}
@@ -132,10 +140,24 @@ export default function App() {
               <h2>Intelligent Alert — Dashboard</h2>
               <div className="small-muted">Logged in as {user?.username} ({user?.role})</div>
             </div>
-            <div className="row">
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <DemoSelector onCreated={() => setTimeout(triggerRefresh, 700)} />
-              <button className="btn small" onClick={triggerRefresh} style={{ marginLeft: 8 }}>Refresh</button>
-              <button className="btn small" onClick={handleLogout} style={{ marginLeft: 8 }}>Logout</button>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <span className="small-muted" style={{ whiteSpace: 'nowrap' }}>Severity:</span>
+                <select
+                  className="input"
+                  style={{ padding: '4px 8px', fontSize: '14px' }}
+                  value={severityFilter}
+                  onChange={(e) => { setSeverityFilter(e.target.value as any); }}
+                >
+                  <option value="ALL">All</option>
+                  <option value="CRITICAL">Critical</option>
+                  <option value="WARNING">Warning</option>
+                  <option value="INFO">Info</option>
+                </select>
+              </div>
+              <button className="btn small" onClick={triggerRefresh}>Refresh</button>
+              <button className="btn small" onClick={handleLogout}>Logout</button>
             </div>
           </div>
 

@@ -13,15 +13,12 @@ export function startWorker(): void {
 
   const expression = config.workerCron || "*/2 * * * *";
   task = cron.schedule(expression, async () => {
-    console.log(`[worker] running at ${new Date().toISOString()}`);
     try {
       await processPendingAlerts();
     } catch (err) {
       console.error("[worker] error in processPendingAlerts", err);
     }
   });
-
-  console.log(`[worker] scheduled with cron: ${expression}`);
 }
 
 export function stopWorker(): void {
